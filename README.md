@@ -3,64 +3,140 @@
 AI-assisted verification that an alcohol-beverage **label image** matches the data in its
 **COLA application**, for the Alcohol and Tobacco Tax and Trade Bureau (TTB).
 
-> Take-home prototype. Not connected to COLA; stores nothing sensitive.
+**🌐 Live demo:** https://51-81-34-160.nip.io
+*(Prototype only. Not connected to COLA. Nothing you upload is stored.)*
+
+---
 
 ## What it does
 
-An agent uploads a label image (or a batch of them) plus the expected application fields.
-The app extracts the label's text with a vision model and reports, in a few seconds, whether
-each field matches:
+An agent uploads a label image (or a batch of them) plus the expected application fields, and
+within a few seconds the app reports — per field — whether the label matches:
 
-- **Brand name** — match (case/punctuation-tolerant per agent judgment, e.g. `STONE'S THROW` == `Stone's Throw`)
-- **Alcohol content (ABV)** — match
-- **Government Health Warning** — present and **exact**: `GOVERNMENT WARNING:` in all-caps, word-for-word per 27 CFR 16.21
-- Plus class/type, net contents, etc. where present
+- **Brand name** — case/punctuation-tolerant per agent judgment (`STONE'S THROW` == `Stone's Throw`)
+- **Alcohol content (ABV)** — numeric match, tolerant of formatting (`45`, `45%`, `45% Alc./Vol.`)
+- **Government Health Warning** — present **and exact**: `GOVERNMENT WARNING:` in all-caps,
+  word-for-word per 27 CFR 16.21 (catches paraphrases, title-case headers, omissions)
+- Plus **class/type** and **net contents** when supplied in the application
 
-## Design targets (from stakeholder interviews)
+It also supports **batch** uploads (hundreds of labels) with a pass/fail summary.
 
-| Requirement | Source |
-| --- | --- |
-| Result in **≤ 5 seconds** | Sarah Chen |
-| **Dead-simple UI** ("my 73-yo mother could use it") | Sarah Chen |
-| **Batch upload** (200–300 at once) | Sarah / Janet |
-| Warning check **exact** (catch font/wording cheats) | Jenny Park |
-| Apply **judgment** on trivial mismatches | Dave Morrison |
-| Tolerate **imperfect photos** (angle, glare) | Jenny Park |
-| Mind **firewall / no sensitive storage** | Marcus Williams |
+## Screenshot
 
-## Status
+The single-label screen — large controls, two clear steps, one obvious button:
 
-🚧 Under construction — being built and tracked via [Gas Town](https://github.com/gastownhall/gastown)
-multi-agent orchestration. Setup, run, and approach docs land as the build completes.
+![UI](docs/screenshot-home.png)
 
-## Layout
+## How it works
 
 ```
-backend/    FastAPI service: /verify, /verify/batch, vision extraction + matching
-frontend/   Single-page, large-control UI for upload + results
-docs/        APPROACH.md — approach, tools, assumptions, trade-offs
-samples/     Example labels + application manifests for testing
+Browser (static HTML/CSS/JS)
+        │  multipart upload (image + expected fields)
+        ▼
+FastAPI  ──►  OpenRouter (vision model)  ──►  strict-JSON label fields
+        │                                          │
+        └──────────►  deterministic matching  ◄────┘
+                      (brand judgment · ABV · EXACT warning)
+        ▼
+  PASS / FAIL + per-field results  (≈4–5s)
 ```
 
-## Running the backend
+- One vision call per label extracts the printed fields as JSON; matching is **deterministic
+  Python** (no second LLM call) so results are fast, auditable, and consistent.
+- The government-warning check is the strict one: it enforces the all-caps header and compares
+  the body to the statutory text word-for-word.
+
+See [`docs/SPEC.md`](docs/SPEC.md) for the full contract and [`docs/APPROACH.md`](docs/APPROACH.md)
+for approach, tools, assumptions, and trade-offs.
+
+## Project layout
+
+```
+backend/
+  app/
+    config.py        # .env-backed settings
+    openrouter.py    # async OpenRouter (OpenAI-compatible) client
+    extraction.py    # image -> structured label fields (strict JSON)
+    verification.py  # deterministic matching rules (pure functions)
+    main.py          # FastAPI: /health, /verify, /verify/batch, serves frontend
+  tests/             # 24 unit tests (matching logic + mocked client + extraction)
+frontend/            # single-page UI (index.html, style.css, app.js) — no build step
+samples/             # generator + 5 synthetic test labels + applications.json
+docs/                # SPEC.md, APPROACH.md
+```
+
+## Run it locally
+
+Requires Python 3.12 (3.11–3.13 fine; 3.14 lacks some wheels). [`uv`](https://docs.astral.sh/uv/)
+recommended but plain `venv` works.
 
 ```bash
+git clone https://github.com/Julian-Stancioff/ttb-label-verification.git
+cd ttb-label-verification
+
+# 1. Configure your OpenRouter key
+cp .env.example .env        # then edit .env and set OPENROUTER_API_KEY
+
+# 2. Install + run
 cd backend
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cp ../.env.example ../.env                            # then fill in OPENROUTER_API_KEY
+uv venv --python 3.12 .venv && source .venv/bin/activate
+uv pip install -r requirements.txt          # or: pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 
-uvicorn app.main:app --reload                         # serves on http://127.0.0.1:8000
-# or: python -m app.main                              # uses HOST/PORT from .env
+# 3. Open http://localhost:8000
 ```
 
-Check it's up: `curl http://127.0.0.1:8000/health` → `{"status":"ok"}`.
-
-Run the tests (the OpenRouter HTTP call is mocked, so no API key or network is needed):
+### Tests
 
 ```bash
-cd backend && pytest
+cd backend && source .venv/bin/activate
+python -m pytest -q          # 24 passing
 ```
+
+### Generate sample labels
+
+```bash
+cd backend && source .venv/bin/activate && pip install pillow
+python ../samples/generate_samples.py       # writes samples/images/*.png + applications.json
+```
+
+## Configuration (`.env`)
+
+| Key | Default | Notes |
+| --- | --- | --- |
+| `OPENROUTER_API_KEY` | — | **required** |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenAI-compatible endpoint |
+| `LLM_MODEL` | `anthropic/claude-sonnet-4.5` | any OpenRouter vision model |
+| `HOST` / `PORT` | `0.0.0.0` / `8000` | server bind |
+| `BATCH_CONCURRENCY` | `8` | parallel labels per batch request |
+| `REQUEST_TIMEOUT` | `20` | per-label model timeout (s) |
+
+## API
+
+| Method | Path | Body | Returns |
+| --- | --- | --- | --- |
+| `GET` | `/health` | — | `{status, model, configured}` |
+| `POST` | `/verify` | `image` (file) + `application` (JSON string) | `{overall, fields[], extracted, elapsed_ms, warning_detail}` |
+| `POST` | `/verify/batch` | `images[]` + `applications` (JSON array) | `{results[], summary{pass,fail,error,total}}` |
+
+```bash
+curl -s -X POST https://51-81-34-160.nip.io/verify \
+  -F "image=@samples/images/01_pass_old_tom.png" \
+  -F 'application={"brand_name":"Old Tom Distillery","alcohol_content":"45% Alc./Vol."}'
+```
+
+## Deployment
+
+The live demo runs on a Linux VPS: a `systemd` unit runs `uvicorn` on `127.0.0.1:8000`, and
+**Caddy** terminates HTTPS (automatic Let's Encrypt cert) at `51-81-34-160.nip.io`, reverse-proxying
+to the app. No database; uploads are processed in memory and discarded.
+
+## Note on how this was built
+
+This prototype was developed using [**Gas Town**](https://github.com/gastownhall/gastown), a
+multi-agent orchestration system, as the workflow harness — the work was tracked as **beads**
+(issues) in a Gas Town *rig*, and an autonomous *polecat* agent produced the initial backend-core
+commit. See [`docs/APPROACH.md`](docs/APPROACH.md) for details.
 
 ## License
 
