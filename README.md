@@ -42,6 +42,26 @@ docs/        APPROACH.md — approach, tools, assumptions, trade-offs
 samples/     Example labels + application manifests for testing
 ```
 
+## Running the backend
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp ../.env.example ../.env                            # then fill in OPENROUTER_API_KEY
+
+uvicorn app.main:app --reload                         # serves on http://127.0.0.1:8000
+# or: python -m app.main                              # uses HOST/PORT from .env
+```
+
+Check it's up: `curl http://127.0.0.1:8000/health` → `{"status":"ok"}`.
+
+Run the tests (the OpenRouter HTTP call is mocked, so no API key or network is needed):
+
+```bash
+cd backend && pytest
+```
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
