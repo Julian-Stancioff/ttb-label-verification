@@ -21,3 +21,17 @@ backend/uploads/
 
 # OS
 .DS_Store
+
+# Gas Town (added by gt)
+.runtime/
+.claude/
+.opencode/
+.logs/
+.beads/
+state.json
+config.yaml
+AGENTS.md
+PRIME.md
+CLAUDE.md
+CLAUDE.local.md
+GEMINI.md
