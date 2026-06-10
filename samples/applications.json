@@ -1,0 +1,30 @@
+[
+  {
+    "brand_name": "Old Tom Distillery",
+    "class_type": "Kentucky Straight Bourbon Whiskey",
+    "alcohol_content": "45% Alc./Vol.",
+    "net_contents": "750 mL",
+    "filename": "01_pass_old_tom.png"
+  },
+  {
+    "brand_name": "Stone\u2019s Throw",
+    "alcohol_content": "50%",
+    "class_type": "Straight Rye Whiskey",
+    "filename": "02_pass_stones_throw.png"
+  },
+  {
+    "brand_name": "Riverbend Reserve",
+    "alcohol_content": "40%",
+    "filename": "03_fail_titlecase_warning.png"
+  },
+  {
+    "brand_name": "Harbor Light Gin",
+    "alcohol_content": "40% Alc./Vol.",
+    "filename": "04_fail_abv_mismatch.png"
+  },
+  {
+    "brand_name": "Summit Vodka",
+    "alcohol_content": "40%",
+    "filename": "05_fail_paraphrased_warning.png"
+  }
+]
