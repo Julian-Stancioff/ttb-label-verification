@@ -1,8 +1,4 @@
-"""Unit tests for the OpenRouter client.
-
-The HTTP call is mocked via httpx.MockTransport so no network is touched.
-"""
-
+"""Unit tests for the OpenRouter client + extraction parsing (HTTP fully mocked)."""
 from __future__ import annotations
 
 import json
@@ -10,132 +6,73 @@ import json
 import httpx
 import pytest
 
-from app.config import Settings
-from app.openrouter import (
-    OpenRouterClient,
-    OpenRouterError,
-    _extract_assistant_text,
-)
-
-PNG_DATA_URL = "data:image/png;base64,iVBORw0KGgo="
+import app.openrouter as orm
+from app.config import get_settings
+from app.extraction import parse_extraction_json
+from app.openrouter import OpenRouterError, chat_vision_json, image_to_data_url
 
 
-def _settings(**over: object) -> Settings:
-    base = dict(
-        openrouter_api_key="test-key",
-        openrouter_base_url="https://example.test/api/v1",
-        llm_model="anthropic/claude-sonnet-4.5",
-    )
-    base.update(over)
-    return Settings(**base)
-
-
-def _client_with_handler(handler, **settings_over) -> OpenRouterClient:
-    transport = httpx.MockTransport(handler)
-    http = httpx.AsyncClient(transport=transport)
-    return OpenRouterClient(_settings(**settings_over), client=http)
+def test_image_to_data_url():
+    url = image_to_data_url(b"hello", "image/png")
+    assert url.startswith("data:image/png;base64,")
 
 
 @pytest.mark.asyncio
-async def test_send_text_and_image_returns_assistant_text():
-    captured: dict[str, object] = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        captured["url"] = str(request.url)
-        captured["auth"] = request.headers.get("authorization")
-        captured["body"] = json.loads(request.content)
-        return httpx.Response(
-            200,
-            json={
-                "choices": [
-                    {"message": {"role": "assistant", "content": '{"brand_name":"X"}'}}
-                ]
-            },
-        )
-
-    client = _client_with_handler(handler)
-    result = await client.send_text_and_image(
-        "extract fields",
-        PNG_DATA_URL,
-        response_format={"type": "json_object"},
-    )
-
-    assert result == '{"brand_name":"X"}'
-    assert captured["url"] == "https://example.test/api/v1/chat/completions"
-    assert captured["auth"] == "Bearer test-key"
-
-    body = captured["body"]
-    assert body["model"] == "anthropic/claude-sonnet-4.5"
-    assert body["response_format"] == {"type": "json_object"}
-    # The user message must carry both the text and the image data URL.
-    content = body["messages"][0]["content"]
-    types = {part["type"] for part in content}
-    assert types == {"text", "image_url"}
-    image_part = next(p for p in content if p["type"] == "image_url")
-    assert image_part["image_url"]["url"] == PNG_DATA_URL
-
-
-@pytest.mark.asyncio
-async def test_chat_uses_model_override():
-    captured: dict[str, object] = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        captured["body"] = json.loads(request.content)
-        return httpx.Response(
-            200, json={"choices": [{"message": {"content": "ok"}}]}
-        )
-
-    client = _client_with_handler(handler)
-    await client.send_text_and_image("hi", PNG_DATA_URL, model="other/model")
-    assert captured["body"]["model"] == "other/model"
-
-
-@pytest.mark.asyncio
-async def test_missing_api_key_raises():
-    def handler(request: httpx.Request) -> httpx.Response:  # pragma: no cover
-        raise AssertionError("should not be called")
-
-    client = _client_with_handler(handler, openrouter_api_key="")
-    with pytest.raises(OpenRouterError, match="API_KEY"):
-        await client.send_text_and_image("hi", PNG_DATA_URL)
-
-
-@pytest.mark.asyncio
-async def test_http_error_status_raises():
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(401, text="unauthorized")
-
-    client = _client_with_handler(handler)
-    with pytest.raises(OpenRouterError, match="401"):
-        await client.send_text_and_image("hi", PNG_DATA_URL)
-
-
-@pytest.mark.asyncio
-async def test_non_json_body_raises():
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text="not json")
-
-    client = _client_with_handler(handler)
-    with pytest.raises(OpenRouterError, match="non-JSON"):
-        await client.chat([{"role": "user", "content": "hi"}])
-
-
-def test_extract_assistant_text_from_list_content():
-    body = {
-        "choices": [
-            {
-                "message": {
-                    "content": [
-                        {"type": "text", "text": "hello "},
-                        {"type": "text", "text": "world"},
-                    ]
-                }
-            }
-        ]
-    }
-    assert _extract_assistant_text(body) == "hello world"
-
-
-def test_extract_assistant_text_bad_shape_raises():
+async def test_chat_vision_requires_api_key(monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     with pytest.raises(OpenRouterError):
-        _extract_assistant_text({"nope": True})
+        await chat_vision_json(system_prompt="s", user_text="u", image_data_url="data:,x")
+    get_settings.cache_clear()
+
+
+def _patch_transport(monkeypatch, transport):
+    real = httpx.AsyncClient
+    monkeypatch.setattr(
+        orm.httpx, "AsyncClient",
+        lambda *a, **k: real(*a, **{**k, "transport": transport}),
+    )
+
+
+@pytest.mark.asyncio
+async def test_chat_vision_returns_content(monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    payload = {"choices": [{"message": {"content": '{"brand_name": "ACME"}'}}]}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["Authorization"] == "Bearer test-key"
+        return httpx.Response(200, json=payload)
+
+    _patch_transport(monkeypatch, httpx.MockTransport(handler))
+    content = await chat_vision_json(system_prompt="s", user_text="u", image_data_url="data:,x")
+    assert json.loads(content)["brand_name"] == "ACME"
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_chat_vision_http_error(monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    _patch_transport(monkeypatch, httpx.MockTransport(lambda req: httpx.Response(500, text="boom")))
+    with pytest.raises(OpenRouterError):
+        await chat_vision_json(system_prompt="s", user_text="u", image_data_url="data:,x")
+    get_settings.cache_clear()
+
+
+# --- extraction JSON parsing ----------------------------------------------
+
+def test_parse_extraction_plain_json():
+    out = parse_extraction_json('{"brand_name": "ACME", "abv_percent": "45%"}')
+    assert out["brand_name"] == "ACME"
+    assert out["abv_percent"] == 45.0  # coerced from "45%"
+
+
+def test_parse_extraction_fenced_json():
+    out = parse_extraction_json('```json\n{"brand_name": "ACME"}\n```')
+    assert out["brand_name"] == "ACME"
+
+
+def test_parse_extraction_bad_json_raises():
+    with pytest.raises(OpenRouterError):
+        parse_extraction_json("not json at all")
