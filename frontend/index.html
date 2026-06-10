@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TTB Label Verification</title>
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>🥃 Label Verification</h1>
+    <p class="sub">Check that an alcohol label matches its application — brand, alcohol content, and the government warning.</p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button id="tab-one" class="tab active" role="tab" aria-selected="true">Check One Label</button>
+    <button id="tab-batch" class="tab" role="tab" aria-selected="false">Check Many (Batch)</button>
+  </nav>
+
+  <!-- ===================== SINGLE ===================== -->
+  <main id="panel-one" class="panel">
+    <section class="card">
+      <h2>Step 1 — Add the label picture</h2>
+      <div id="drop-one" class="dropzone" tabindex="0" role="button" aria-label="Choose a label image">
+        <div class="dz-inner">
+          <div class="dz-icon">📷</div>
+          <div class="dz-text">Drag a label image here<br /><span>or click to choose a file</span></div>
+        </div>
+        <img id="preview-one" alt="Label preview" hidden />
+        <input type="file" id="file-one" accept="image/*" hidden />
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Step 2 — Type what the application says</h2>
+      <p class="hint">Fill in what you expect. Leave a box empty to skip that check.</p>
+      <div class="form-grid">
+        <label>Brand name<input type="text" id="f-brand" placeholder="e.g. Old Tom Distillery" /></label>
+        <label>Alcohol content<input type="text" id="f-abv" placeholder="e.g. 45% Alc./Vol." /></label>
+        <label>Class / type<input type="text" id="f-class" placeholder="e.g. Kentucky Straight Bourbon Whiskey" /></label>
+        <label>Net contents<input type="text" id="f-net" placeholder="e.g. 750 mL" /></label>
+      </div>
+    </section>
+
+    <button id="go-one" class="big-btn" disabled>Verify Label</button>
+
+    <div id="result-one" class="result" hidden></div>
+  </main>
+
+  <!-- ===================== BATCH ===================== -->
+  <main id="panel-batch" class="panel" hidden>
+    <section class="card">
+      <h2>Step 1 — Add many label pictures</h2>
+      <div id="drop-batch" class="dropzone" tabindex="0" role="button" aria-label="Choose label images">
+        <div class="dz-inner">
+          <div class="dz-icon">🗂️</div>
+          <div class="dz-text">Drag many label images here<br /><span>or click to choose files</span></div>
+        </div>
+        <input type="file" id="file-batch" accept="image/*" multiple hidden />
+      </div>
+      <p id="batch-count" class="hint"></p>
+    </section>
+
+    <section class="card">
+      <h2>Step 2 — (Optional) Paste the applications</h2>
+      <p class="hint">A JSON list, one entry per label. Match to a picture with a <code>"filename"</code> key,
+        or leave this empty to just check that every label has a valid government warning.</p>
+      <textarea id="batch-apps" rows="6" placeholder='[
+  {"filename": "label1.png", "brand_name": "Old Tom Distillery", "alcohol_content": "45% Alc./Vol."}
+]'></textarea>
+    </section>
+
+    <button id="go-batch" class="big-btn" disabled>Verify All Labels</button>
+
+    <div id="batch-summary" class="summary" hidden></div>
+    <div id="result-batch"></div>
+  </main>
+
+  <footer>
+    <p>Prototype for the TTB Compliance Division. Nothing you upload is stored.
+       Results in a few seconds. <span id="model-tag"></span></p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
