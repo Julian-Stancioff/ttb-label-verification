@@ -113,6 +113,90 @@ SAMPLES = [
         warning=CANONICAL.replace("birth defects", "birth problems"),
         application={"brand_name": "Summit Vodka", "alcohol_content": "40%"},
     ),
+    # ---- extra batch fixtures (varied beverage types & cases) ----
+    dict(
+        filename="06_pass_harvest_moon_wine.png",
+        brand="HARVEST MOON CELLARS", klass="Napa Valley Cabernet Sauvignon",
+        abv="13.5% Alc./Vol.", net="750 mL",
+        producer="Harvest Moon Cellars, Napa, CA", warning=CANONICAL,
+        application={"brand_name": "Harvest Moon Cellars",
+                     "class_type": "Napa Valley Cabernet Sauvignon",
+                     "alcohol_content": "13.5% Alc./Vol."},
+    ),
+    dict(
+        filename="07_pass_iron_anchor_ipa.png",
+        brand="IRON ANCHOR BREWING", klass="India Pale Ale",
+        abv="6.8% Alc./Vol.", net="12 FL OZ",
+        producer="Iron Anchor Brewing Co., San Diego, CA", warning=CANONICAL,
+        application={"brand_name": "Iron Anchor Brewing", "alcohol_content": "6.8%"},
+    ),
+    dict(
+        filename="08_pass_palm_cove_rum.png",
+        brand="PALM COVE RUM", klass="Aged Caribbean Rum",
+        abv="40% Alc./Vol. (80 Proof)", net="750 mL",
+        producer="Palm Cove Distillers, Miami, FL", warning=CANONICAL,
+        application={"brand_name": "Palm Cove Rum", "alcohol_content": "40%"},
+    ),
+    dict(
+        filename="09_pass_agave_and_oak_tequila.png",
+        brand="AGAVE & OAK", klass="Tequila Reposado",
+        abv="38% Alc./Vol.", net="750 mL",
+        producer="Agave & Oak S.A., Jalisco, Mexico", warning=CANONICAL,
+        # Application writes "and" instead of "&" -> judgment should still PASS.
+        application={"brand_name": "Agave and Oak", "alcohol_content": "38%"},
+    ),
+    dict(
+        filename="10_fail_missing_warning.png",
+        brand="MIDNIGHT OAK WHISKEY", klass="Tennessee Whiskey",
+        abv="43% Alc./Vol. (86 Proof)", net="750 mL",
+        producer="Midnight Oak Distillery, Lynchburg, TN",
+        warning="",  # No government warning at all -> must FAIL.
+        application={"brand_name": "Midnight Oak Whiskey", "alcohol_content": "43%"},
+    ),
+    dict(
+        filename="11_fail_brand_mismatch.png",
+        brand="SILVER PEAK GIN", klass="London Dry Gin",
+        abv="44% Alc./Vol.", net="750 mL",
+        producer="Silver Peak Distilling, Boise, ID", warning=CANONICAL,
+        # Genuinely different brand on the application -> must FAIL.
+        application={"brand_name": "Golden Peak Gin", "alcohol_content": "44%"},
+    ),
+    dict(
+        filename="12_fail_abv_wine.png",
+        brand="CEDAR RIDGE VINEYARDS", klass="Oregon Pinot Noir",
+        abv="14.1% Alc./Vol.", net="750 mL",
+        producer="Cedar Ridge Vineyards, Willamette, OR", warning=CANONICAL,
+        application={"brand_name": "Cedar Ridge Vineyards",
+                     "alcohol_content": "12.5% Alc./Vol."},  # ABV disagrees -> FAIL.
+    ),
+    dict(
+        filename="13_fail_warning_missing_part2.png",
+        brand="BLUE HERON VODKA", klass="Vodka",
+        abv="40% Alc./Vol.", net="750 mL",
+        producer="Blue Heron Spirits, Portland, OR",
+        # Only clause (1) of the warning -> incomplete -> must FAIL.
+        warning=("GOVERNMENT WARNING: (1) According to the Surgeon General, women "
+                 "should not drink alcoholic beverages during pregnancy because of "
+                 "the risk of birth defects."),
+        application={"brand_name": "Blue Heron Vodka", "alcohol_content": "40%"},
+    ),
+    dict(
+        filename="14_pass_copper_kettle_bourbon.png",
+        brand="COPPER KETTLE BOURBON", klass="Kentucky Straight Bourbon Whiskey",
+        abv="46% Alc./Vol. (92 Proof)", net="750 mL",
+        producer="Copper Kettle Distillery, Frankfort, KY", warning=CANONICAL,
+        application={"brand_name": "Copper Kettle Bourbon", "alcohol_content": "46%",
+                     "net_contents": "750 mL"},
+    ),
+    dict(
+        filename="15_fail_titlecase_brandy.png",
+        brand="GOLDEN VALLEY BRANDY", klass="California Brandy",
+        abv="40% Alc./Vol.", net="750 mL",
+        producer="Golden Valley Spirits, Fresno, CA",
+        # Header in Title Case instead of ALL CAPS -> must FAIL.
+        warning=CANONICAL.replace("GOVERNMENT WARNING:", "Government Warning:"),
+        application={"brand_name": "Golden Valley Brandy", "alcohol_content": "40%"},
+    ),
 ]
 
 

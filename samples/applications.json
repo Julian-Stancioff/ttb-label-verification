@@ -26,5 +26,57 @@
     "brand_name": "Summit Vodka",
     "alcohol_content": "40%",
     "filename": "05_fail_paraphrased_warning.png"
+  },
+  {
+    "brand_name": "Harvest Moon Cellars",
+    "class_type": "Napa Valley Cabernet Sauvignon",
+    "alcohol_content": "13.5% Alc./Vol.",
+    "filename": "06_pass_harvest_moon_wine.png"
+  },
+  {
+    "brand_name": "Iron Anchor Brewing",
+    "alcohol_content": "6.8%",
+    "filename": "07_pass_iron_anchor_ipa.png"
+  },
+  {
+    "brand_name": "Palm Cove Rum",
+    "alcohol_content": "40%",
+    "filename": "08_pass_palm_cove_rum.png"
+  },
+  {
+    "brand_name": "Agave and Oak",
+    "alcohol_content": "38%",
+    "filename": "09_pass_agave_and_oak_tequila.png"
+  },
+  {
+    "brand_name": "Midnight Oak Whiskey",
+    "alcohol_content": "43%",
+    "filename": "10_fail_missing_warning.png"
+  },
+  {
+    "brand_name": "Golden Peak Gin",
+    "alcohol_content": "44%",
+    "filename": "11_fail_brand_mismatch.png"
+  },
+  {
+    "brand_name": "Cedar Ridge Vineyards",
+    "alcohol_content": "12.5% Alc./Vol.",
+    "filename": "12_fail_abv_wine.png"
+  },
+  {
+    "brand_name": "Blue Heron Vodka",
+    "alcohol_content": "40%",
+    "filename": "13_fail_warning_missing_part2.png"
+  },
+  {
+    "brand_name": "Copper Kettle Bourbon",
+    "alcohol_content": "46%",
+    "net_contents": "750 mL",
+    "filename": "14_pass_copper_kettle_bourbon.png"
+  },
+  {
+    "brand_name": "Golden Valley Brandy",
+    "alcohol_content": "40%",
+    "filename": "15_fail_titlecase_brandy.png"
   }
 ]
