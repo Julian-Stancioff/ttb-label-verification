@@ -110,3 +110,27 @@ a multi-agent orchestration system. Concretely:
   not always spawn the agent session), so the remaining work ran in Gas Town's documented
   **minimal mode** — the orchestrator tracks state in beads while a runtime instance does the work —
   which kept delivery reliable without losing the beads-tracked workflow.
+
+## Interface: built to the U.S. Web Design System (USWDS)
+
+To make the prototype look like a real federal tool (and to be familiar to TTB staff), the UI follows
+the [U.S. Web Design System](https://designsystem.digital.gov/) — the official standard behind
+`.gov` sites including ttb.gov and treasury.gov. I screenshotted those live sites for reference and
+matched: the **official-government banner**, an **agency-seal header** with the Treasury/TTB wordmark,
+a **navy primary-navigation bar** for the tabs, USWDS **alert** components for PASS/FAIL, USWDS
+**buttons**, and the **Public Sans** typeface and federal color tokens (`#162e51`, `#005ea2`, …).
+
+## History (client-side, privacy-preserving)
+
+A **History** tab lets an agent save any single or batch result under a custom name; each entry is
+stamped with the save time and can be viewed or deleted. History lives in the **browser's
+localStorage** — deliberately *not* on the server — so no application data or PII is ever persisted
+server-side (Marcus's constraint). It's per-browser, which is the right scope for a prototype; a
+production version would move this to an authenticated per-user store.
+
+## Browser automation note (Playwright MCP)
+
+The [Playwright MCP](https://github.com/microsoft/playwright-mcp) server is installed and registered
+for browser automation. Playwright's bundled browsers don't install on this host's OS (Ubuntu 26.04),
+so it's configured to drive the system Chromium via `--executable-path`. Interactive UI testing in
+this repo was done by connecting Playwright to that Chromium over the DevTools Protocol (CDP).

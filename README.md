@@ -19,11 +19,20 @@ within a few seconds the app reports — per field — whether the label matches
   word-for-word per 27 CFR 16.21 (catches paraphrases, title-case headers, omissions)
 - Plus **class/type** and **net contents** when supplied in the application
 
-It also supports **batch** uploads (hundreds of labels) with a pass/fail summary.
+It also supports **batch** uploads (hundreds of labels) with a pass/fail summary, and a
+**History** tab where any single or batch check can be saved with a custom name and timestamp.
+
+The interface is built to the **U.S. Web Design System (USWDS)** — the official standard for
+federal websites — so it reads as a genuine TTB/Treasury system: the official-government banner,
+the agency seal header, navy primary navigation, and USWDS alert/button components.
+
+- **History** — click *"Save to history as…"* (or *"Save batch to history as…"*) on any result,
+  name it, and it appears in the History tab with a timestamp. Stored **locally in the browser
+  only** (localStorage) — nothing is persisted server-side, in keeping with the no-PII guidance.
 
 ## Screenshot
 
-The single-label screen — large controls, two clear steps, one obvious button:
+The single-label screen, in the federal design system — official banner, agency seal, navy nav:
 
 ![UI](docs/screenshot-home.png)
 
