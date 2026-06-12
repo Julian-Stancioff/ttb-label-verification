@@ -26,6 +26,10 @@ class Settings:
         self.batch_concurrency = int(os.getenv("BATCH_CONCURRENCY", "8"))
         # Per-label model timeout (seconds). Keeps us inside the 5s UX budget.
         self.request_timeout = float(os.getenv("REQUEST_TIMEOUT", "20"))
+        # Persistent data dir: SQLite DB + stored label images for the review queue.
+        # In the container this is a mounted volume (default /data); locally ./data.
+        default_data = "/data" if Path("/data").is_dir() else str(_PROJECT_ROOT / "data")
+        self.data_dir = Path(os.getenv("DATA_DIR", default_data))
 
     @property
     def configured(self) -> bool:

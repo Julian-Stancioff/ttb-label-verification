@@ -16,6 +16,7 @@ node_modules/
 dist/
 
 # Uploads / runtime
+data/
 backend/uploads/
 *.log
 
