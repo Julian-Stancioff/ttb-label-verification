@@ -14,9 +14,14 @@ non-technical 70-something agent can use, with **batch** support for hundreds of
 - **Vision/extraction:** **OpenRouter** (OpenAI-compatible Chat Completions API), model from
   `LLM_MODEL` (default `anthropic/claude-sonnet-4.5`), one multimodal call per label that returns
   **strict JSON** of the fields read off the label image.
+- **OCR:** **Tesseract** (`pytesseract`) reads word-level boxes locally; `alignment.py` links each
+  extracted field value to the OCR words that printed it, for image highlighting in the review UI.
 - **Matching:** deterministic Python — no second LLM call (keeps us under 5s and auditable).
-- **Frontend:** one static HTML/CSS/JS page (no build step). Large controls, high contrast.
-- **Storage:** none. Images processed in memory and discarded (Marcus: no sensitive storage).
+- **Frontend:** static HTML/CSS/JS (no build step), three tabs: Submit / Review Queue / History.
+- **Storage:** SQLite (`store.py`) on a data volume (`DATA_DIR`) persists the review queue — each
+  item, its image, OCR/alignment geometry, reviewer edits, the decision, and an audit trail. (v1 was
+  stateless; v2 added the persistent queue because the workflow needs a durable, auditable record.
+  Synthetic labels only; label text is public, not PII — see APPROACH.md.)
 
 ## Config (`.env`, loaded by backend; never commit)
 
@@ -81,12 +86,30 @@ GOVERNMENT WARNING: (1) According to the Surgeon General, women should not drink
 
 ## API
 
-- `GET /health` → `{"status":"ok"}`
+**Core / frontend**
+
+- `GET /health` → `{"status":"ok", model, configured}`
 - `GET /` → the frontend page
+
+**Review-queue API (persistent — backs the UI)**
+
+- `POST /api/items` — intake one label (runs the pipeline, persists a pending queue item).
+- `POST /api/items/batch` — intake many; one queue item each.
+- `GET /api/items?status=pending|decided|all` — list queue/history + status counts.
+- `GET /api/items/{id}` — full item incl. OCR + alignment geometry.
+- `GET /api/items/{id}/image` — the stored label image.
+- `POST /api/items/{id}/edit` — reviewer corrects either side; deterministic re-match (no AI).
+- `POST /api/items/{id}/redo` — re-run the AI pipeline (optional replacement image).
+- `POST /api/items/{id}/decide` — approve / decline (with note); appended to audit trail.
+- `POST /api/items/bulk-approve` — approve many pending items at once.
+- `DELETE /api/items/{id}` — remove an item + its image.
+
+**Legacy stateless endpoints (kept for scripting/compatibility)**
+
 - `POST /verify` — multipart: `image` (file) + `application` (JSON string of expected fields).
   Returns `{overall, fields[], extracted, elapsed_ms, warning_detail}`.
 - `POST /verify/batch` — multipart: many `images[]` + `applications` (JSON array, matched by
-  filename or index). Returns `{results:[{filename, overall, fields[], ...}], summary:{pass,fail,total}}`.
+  filename or index). Returns `{results:[{filename, overall, fields[], ...}], summary:{pass,fail,error,total}}`.
   Process concurrently (bounded) so batches stay responsive.
 
 ## UX requirements (Sarah / Dave / Jenny)

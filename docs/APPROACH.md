@@ -32,6 +32,28 @@ pass/fail logic is then plain, deterministic Python** — not a second LLM call.
 The model is asked to **transcribe verbatim** (preserve case/punctuation) so the warning check can
 be exact; the *judgment* (case-insensitive brand matching) lives in code where it's explicit.
 
+### Human-in-the-loop review queue (the core of the tool)
+
+The requirement isn't "print a verdict" — it's "**flag discrepancies for human review**." So a
+submission doesn't end at PASS/FAIL; it lands in a persistent **review queue** where a compliance
+reviewer makes the call. Each item is run through a single pipeline (`service.py`): vision
+extraction + **Tesseract OCR** (word boxes) + deterministic match + **field→box alignment**, all
+persisted to SQLite (`store.py`) with the original image and an audit trail.
+
+The queue is **exception-first** — errors and FAILs sort to the top, clean passes to the bottom for
+one-click or bulk approval — so reviewers spend their time on the labels that need it. Opening an
+item gives a **side-by-side station**: the image annotated with OCR boxes (every word faint, the
+located fields highlighted and hover-linked to the table) next to an editable expected-vs-extracted
+table. The reviewer can **approve, decline (with a note), edit either side** (instant deterministic
+re-match, no AI), or **redo** the AI on a replacement photo. Every action is stamped into the
+item's audit trail with the reviewer's name.
+
+**Why OCR *and* a vision model?** They do different jobs. The vision model gives trustworthy
+*semantic* fields (this is the brand, this is the ABV); Tesseract gives trustworthy *geometry*
+(where each word sits). `alignment.py` links the two with fuzzy token-window matching so the UI can
+show a reviewer exactly where on the label a field came from — grounding the AI's reading in the
+pixels, which is what makes a human spot-check fast.
+
 ### The government-warning check
 
 Canonical text is 27 CFR 16.21. A warning **passes** only if: it is present; the header
@@ -54,8 +76,10 @@ never a failure. Overall verdict is **PASS** iff the warning passes and every *p
 | **OpenRouter** (`anthropic/claude-sonnet-4.5`) | One OpenAI-compatible endpoint, swappable model, strong vision/OCR for fine print. |
 | **Vanilla HTML/CSS/JS** | No build step, no framework risk; loads on any office browser; easy to keep simple. |
 | **httpx** | Async HTTP to the model; mockable in tests. |
-| **pytest** (24 tests) | Cover the matching logic, the mocked client, and JSON parsing. |
-| **Pillow** | *Dev-only* — generates synthetic test labels. Not an app runtime dependency. |
+| **Tesseract** (`pytesseract`) | Word-level OCR boxes for the review station; runs locally, no network. |
+| **Pillow** | Image loading/EXIF for OCR (runtime) and generating synthetic test labels (dev). |
+| **SQLite** (stdlib `sqlite3`) | Persists the review queue + audit trail; zero-ops, WAL mode for the two workers. |
+| **pytest** (38 tests) | Matching logic, alignment, the store, the review-queue API, and the mocked client. |
 | **Caddy + systemd + nip.io** | Automatic HTTPS and a persistent service for the deployed prototype. |
 | **Gas Town** | Multi-agent orchestration harness used to run the project (see below). |
 
@@ -78,15 +102,25 @@ sub-millisecond).
   simplification a reviewer can tighten.
 - **English-language labels.**
 - **Batch applications** are matched to images by a `filename` key, else by upload order.
-- **No persistence / no auth** — appropriate for a throwaway prototype; explicitly *not* production.
+- **Persistence without auth.** The review queue + audit trail are persisted to a local SQLite DB
+  (the workflow needs durable state), but there is **no authentication** and a single shared
+  reviewer-name field — appropriate for a single-host prototype, explicitly *not* production. See
+  the PII trade-off below.
 
 ## Trade-offs & limitations
 
 - **Cloud model vs. Marcus's firewall.** The strongest accuracy on glare/angled photos comes from a
   hosted vision model, but Marcus warned their network blocks ML endpoints. For the prototype I
-  chose accuracy (OpenRouter) and isolated the dependency behind one module (`openrouter.py`). A
-  production path could swap in a self-hosted/on-prem vision model or a local OCR (e.g. Tesseract)
-  fallback without touching the verification rules — the seam is already there.
+  chose accuracy (OpenRouter) and isolated the dependency behind one module (`openrouter.py`). The
+  OCR half already runs **locally** (Tesseract, no network), so a production path could swap the
+  hosted model for a self-hosted/on-prem vision model — or lean harder on local OCR — without
+  touching the verification rules. The seam is already there.
+- **PII / persistence trade-off.** The brief says "no sensitive PII storage for a prototype," but a
+  real review queue needs durable state and an audit trail, so the app **does** persist submissions
+  (image + fields + decisions) to a local SQLite DB. I reconciled this by running the demo only on
+  **synthetic labels** and noting that label text (brand, ABV, warning, net contents) is public,
+  not personal PII. It's single-host and unauthenticated — a prototype, not production; production
+  would add auth, access control, encryption at rest, and a retention/redaction policy.
 - **Imperfect images** are handled by the vision model (it reports `legibility_notes`), not by
   pre-processing. Good enough for a prototype; production could add deskew/denoise.
 - **No COLA integration** by design (Marcus: separate authorization beast).
@@ -120,13 +154,16 @@ matched: the **official-government banner**, an **agency-seal header** with the 
 a **navy primary-navigation bar** for the tabs, USWDS **alert** components for PASS/FAIL, USWDS
 **buttons**, and the **Public Sans** typeface and federal color tokens (`#162e51`, `#005ea2`, …).
 
-## History (client-side, privacy-preserving)
+## Review queue, history, and audit trail (server-side)
 
-A **History** tab lets an agent save any single or batch result under a custom name; each entry is
-stamped with the save time and can be viewed or deleted. History lives in the **browser's
-localStorage** — deliberately *not* on the server — so no application data or PII is ever persisted
-server-side (Marcus's constraint). It's per-browser, which is the right scope for a prototype; a
-production version would move this to an authenticated per-user store.
+Everything a reviewer touches is persisted server-side in a single SQLite DB (`store.py`) on a data
+volume, alongside the original images. An item moves **pending → approved/declined**, and every
+step — submission, edits, redos, the final decision and its note — is appended to a per-item
+**audit trail** stamped with the reviewer's name. The **Review Queue** tab shows pending items
+(exception-first); the **History** tab shows decided items with their full trail. This is a
+deliberate change from a stateless prototype: a compliance tool's value *is* the durable, auditable
+record of who decided what and why. The store is single-host and unauthenticated (a prototype, not
+production); see the PII trade-off above for how this squares with the brief.
 
 ## Browser automation note (Playwright MCP)
 
