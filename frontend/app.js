@@ -360,8 +360,13 @@ function renderImage(item) {
       <g id="ocr-layer">${ocrRects}</g>
       <g id="field-layer">${fieldRects}</g>
     </svg>`;
-  $("toggle-ocr").onchange = (e) =>
+  const toggle = $("toggle-ocr");
+  toggle.onchange = (e) =>
     $("ocr-layer").style.display = e.target.checked ? "" : "none";
+  if (!words.length) {
+    toggle.disabled = true;
+    toggle.closest(".chk").title = "No detected text stored for this item (OCR was unavailable when it was processed).";
+  }
   // box → field row linking
   wrap.querySelectorAll("[data-fbox]").forEach((rect) => {
     const key = rect.dataset.fbox;

@@ -11,9 +11,13 @@ and `alignment.py` links the two.
 from __future__ import annotations
 
 import io
+import logging
+import shutil
 from typing import Any, Optional
 
 from PIL import Image, ImageOps
+
+logger = logging.getLogger(__name__)
 
 try:
     import pytesseract
@@ -23,6 +27,17 @@ except Exception:  # pragma: no cover - import guard
     pytesseract = None  # type: ignore
     Output = None  # type: ignore
     _HAVE_TESSERACT = False
+
+# pytesseract invokes the `tesseract` binary by name. Under systemd or slim
+# containers PATH may not include /usr/bin, so resolve an absolute path here
+# rather than letting every OCR call fail with TesseractNotFoundError.
+if _HAVE_TESSERACT and shutil.which(pytesseract.pytesseract.tesseract_cmd) is None:
+    _found = shutil.which("tesseract", path="/usr/local/bin:/usr/bin:/bin")
+    if _found:
+        pytesseract.pytesseract.tesseract_cmd = _found
+    else:  # pragma: no cover - depends on host install
+        logger.warning("tesseract binary not found; OCR word boxes disabled")
+        _HAVE_TESSERACT = False
 
 # Tesseract confidence below this is treated as noise and dropped.
 _MIN_CONF = 35.0
@@ -61,6 +76,7 @@ def ocr_words(image_bytes: bytes) -> dict[str, Any]:
     try:
         data = pytesseract.image_to_data(ocr_img, output_type=Output.DICT)
     except Exception:
+        logger.warning("Tesseract OCR failed; item will have no word boxes", exc_info=True)
         return {"width": width, "height": height, "words": [], "available": False}
 
     words: list[dict[str, Any]] = []
